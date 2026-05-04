@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  
+  --color-shine-purple: #7C3AED;
+  --color-shine-blue: #4F46E5;
+  --color-shine-bg: #F9FAFB;
+  --color-shine-ink: #111827;
+  
+  --radius-shine: 24px;
+}
+
+@layer base {
+  body {
+    @apply bg-shine-bg text-shine-ink font-sans antialiased;
+  }
+  
+  h1, h2, h3 {
+    @apply font-display font-bold tracking-tight;
+  }
+}
+
+.glass-card {
+  @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-xl shadow-black/5 rounded-shine;
+}
+
+.shimmer-glow {
+  background: linear-gradient(
+    90deg,
+    rgba(124, 58, 237, 0) 0%,
+    rgba(124, 58, 237, 0.1) 50%,
+    rgba(124, 58, 237, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

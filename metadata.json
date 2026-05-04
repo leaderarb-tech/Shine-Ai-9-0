@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Shine AI 9/0",
+  "description": "Expert AI assistant for media specialists to analyze work and generate Match DNA Passports.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
