@@ -1,13 +1,10 @@
 import express from "express";
-import { GoogleGenAI, Type } from "@google/genai";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json({ limit: "50mb" }));
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 app.use(express.static(path.join(__dirname, "dist")));
 
@@ -17,17 +14,17 @@ app.post("/api/analyze", async (req, res) => {
 
     const systemInstruction = `
       Ты — Shine AI, экспертный ИИ-помощник платформы Shine. 
-      Твоя задача — анализировать портфолио медиа-специалистов (может быть несколько работ) и создавать "Паспорт Match DNA".
+      Твоя задача — анализировать портфолио медиа-специалистов и создавать "Паспорт Match DNA".
       
       ЭТАП 1: МОДЕРАЦИЯ И КОНТРОЛЬ КАЧЕСТВА
-      Проанализируй загруженное медиа (видео/фото) как единое комплексное портфолио. Выяви общие закономерности стиля и качества.
+      Проанализируй загруженное медиа как единое портфолио. Выяви общие закономерности стиля и качества.
       Критерии: Низкое разрешение, плохой звук, отсутствие логики монтажа/фото/текста, плагиат или отсутствие навыков.
-      Если работы плохие: Напиши пользователю честный, но профессиональный отзыв: почему портфолио не может быть опубликовано в Shine и какие 3 технических шага нужно сделать, чтобы исправить ситуацию.
+      Если работы плохие: напиши честный профессиональный отзыв и 3 технических шага для исправления.
       Верни JSON с passed: false и technicalSteps.
       
       ЭТАП 2: АНАЛИЗ И ГЕНЕРАЦИЯ MATCH DNA (если passed: true)
       - Карточка 1: Как тебя видит рынок (уровень, стоимость, впечатление).
-      - Карточка 2: Match DNA (5 характеристик, выявленных по портфолио).
+      - Карточка 2: Match DNA (5 характеристик по портфолио).
       - Карточка 3: Слепые зоны (скрытые таланты vs описание, минусы).
       - Карточка 4: Позиционирование (Bio, Кейсы на языке бизнес-результатов).
       - Карточка 5: Smart-фильтры (строго из списка Shine).
@@ -41,18 +38,16 @@ app.post("/api/analyze", async (req, res) => {
       Опыт: до 1 года, 1-2 года, более 3 лет.
       Стиль контента: Минимализм, Тихая роскошь, Динамичный, Киношная картинка, Ретро, 90-е, Яркий, Мрачный, Глубокий.
 
-      Ответ должен быть строго в формате JSON.
+      Отвечай ТОЛЬКО валидным JSON, без markdown и пояснений.
     `;
 
     const prompt = `
       Данные пользователя:
       О себе: ${userData.about}
-      Опыт (заявленный): ${userData.experience}
+      Опыт: ${userData.experience}
       Сфера: ${userData.sphere}
       Формат: ${userData.format}
       Специализация: ${userData.specialization}
-      
-      Проанализируй это портфолио (приложенные медиа-файлы) и выяви общие закономерности стиля и качества.
     `;
 
     const parts: any[] = [{ text: prompt }];
@@ -65,56 +60,30 @@ app.post("/api/analyze", async (req, res) => {
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [{ parts }],
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            passed: { type: Type.BOOLEAN },
-            rejectionReason: { type: Type.STRING },
-            technicalSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            marketPerception: {
-              type: Type.OBJECT,
-              properties: {
-                level: { type: Type.STRING },
-                price: { type: Type.STRING },
-                impression: { type: Type.STRING },
-              },
-            },
-            matchDNA: { type: Type.ARRAY, items: { type: Type.STRING } },
-            blindSpots: { type: Type.STRING },
-            positioning: {
-              type: Type.OBJECT,
-              properties: {
-                bio: { type: Type.STRING },
-                experience: { type: Type.STRING },
-              },
-            },
-            filters: {
-              type: Type.OBJECT,
-              properties: {
-                specialization: { type: Type.STRING },
-                contentFormat: { type: Type.ARRAY, items: { type: Type.STRING } },
-                sphere: { type: Type.ARRAY, items: { type: Type.STRING } },
-                platform: { type: Type.ARRAY, items: { type: Type.STRING } },
-                clientType: { type: Type.STRING },
-                experience: { type: Type.STRING },
-                style: { type: Type.STRING },
-              },
-            },
-          },
-          required: ["passed"],
-        },
-      },
-    });
+    // Вызов напрямую через REST API
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents: [{ parts }],
+          generationConfig: { responseMimeType: "application/json" },
+        }),
+      }
+    );
 
-    res.json(JSON.parse(response.text || "{}"));
+    const data = await response.json() as any;
+    
+    if (!response.ok) {
+      throw new Error(JSON.stringify(data));
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    res.json(JSON.parse(text));
   } catch (err: any) {
-    console.error("Gemini error:", err);
+    console.error("Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
