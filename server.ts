@@ -60,7 +60,6 @@ app.post("/api/analyze", async (req, res) => {
       });
     }
 
-    // Вызов напрямую через REST API
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -75,13 +74,26 @@ app.post("/api/analyze", async (req, res) => {
     );
 
     const data = await response.json() as any;
-    
+
     if (!response.ok) {
       throw new Error(JSON.stringify(data));
     }
 
+    console.log("Gemini response:", JSON.stringify(data, null, 2));
+
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    res.json(JSON.parse(text));
+    console.log("Parsed text:", text);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    }
+
+    res.json(parsed);
+
   } catch (err: any) {
     console.error("Error:", err);
     res.status(500).json({ error: err.message });
